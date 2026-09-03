@@ -16,14 +16,25 @@ PROTOCOL_HEADER = 0xDD00
 COMMAND_GET = 0x0001
 COMMAND_SET = 0x0002
 FEATURE_LIGHT_STATE = 0x0D00
+FEATURE_LIGHT_THEME = 0x0D40
+
+THEMES = {
+    "bounce": 0x89,
+    "loop": 0x88,
+    "switch": 0x8B,
+    "freeze": 0x8C,
+}
 
 
 def packet(command: int, payload: bytes) -> bytes:
     return struct.pack("<HHBBH", PROTOCOL_HEADER, command, 1, 0, len(payload)) + payload
 
 
-def get_light_state_packet() -> bytes:
-    return packet(COMMAND_GET, struct.pack("<H", FEATURE_LIGHT_STATE))
+def get_light_status_packet() -> bytes:
+    return packet(
+        COMMAND_GET,
+        struct.pack("<HH", FEATURE_LIGHT_THEME, FEATURE_LIGHT_STATE),
+    )
 
 
 def set_light_state_packet(enabled: bool) -> bytes:
@@ -31,7 +42,12 @@ def set_light_state_packet(enabled: bool) -> bytes:
     return packet(COMMAND_SET, struct.pack("<HHB", FEATURE_LIGHT_STATE, 1, value))
 
 
-def light_state(replies: Iterable[bytes]) -> bool:
+def set_light_theme_packet(theme: str) -> bytes:
+    return packet(COMMAND_SET, struct.pack("<HHB", FEATURE_LIGHT_THEME, 1, THEMES[theme]))
+
+
+def light_status(replies: Iterable[bytes]) -> dict[int, bytes]:
+    values: dict[int, bytes] = {}
     for reply in replies:
         if len(reply) < 10 or reply[:4] != b"\x00\xdd\x01\x00":
             continue
@@ -44,9 +60,10 @@ def light_state(replies: Iterable[bytes]) -> bool:
             offset += 4
             value = payload[offset : offset + length]
             offset += length
-            if feature == FEATURE_LIGHT_STATE and len(value) == 1:
-                return bool(value[0] & 0x80)
-    raise RuntimeError("The speaker did not return a light-state response")
+            values[feature] = value
+    if FEATURE_LIGHT_STATE not in values:
+        raise RuntimeError("The speaker did not return a light-state response")
+    return values
 
 
 
@@ -69,17 +86,31 @@ async def exchange(address: str, commands: Iterable[bytes]) -> list[bytes]:
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("status", "on", "off"))
+    parser.add_argument("action", choices=("status", "on", "off", "theme"))
+    parser.add_argument(
+        "--theme",
+        choices=THEMES,
+        help="ambient light theme; required with the theme action",
+    )
     parser.add_argument("--address", default=DEFAULT_ADDRESS, help="speaker Bluetooth address")
     args = parser.parse_args()
 
-    commands: list[bytes] = []
-    if args.action != "status":
-        commands.append(set_light_state_packet(args.action == "on"))
-    commands.append(get_light_state_packet())
+    if args.action == "theme" and args.theme is None:
+        parser.error("--theme is required with the theme action")
 
-    enabled = light_state(await exchange(args.address, commands))
+    commands: list[bytes] = []
+    if args.action in ("on", "off"):
+        commands.append(set_light_state_packet(args.action == "on"))
+    elif args.action == "theme":
+        commands.append(set_light_theme_packet(args.theme))
+    commands.append(get_light_status_packet())
+
+    values = light_status(await exchange(args.address, commands))
+    enabled = bool(values[FEATURE_LIGHT_STATE][0] & 0x80)
+    theme = next(name for name, value in THEMES.items() if values[FEATURE_LIGHT_THEME] == bytes([value]))
     print(f"Ambient edge light: {'on' if enabled else 'off'}")
+    print(f"Ambient light theme: {theme}")
+
 
 
 if __name__ == "__main__":
