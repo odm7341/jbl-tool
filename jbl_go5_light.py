@@ -15,6 +15,7 @@ SERVICE_NOTIFY = "65786365-6c70-6f69-6e74-2e636f6d0001"
 PROTOCOL_HEADER = 0xDD00
 COMMAND_GET = 0x0001
 COMMAND_SET = 0x0002
+FEATURE_BATTERY_STATUS = 0x000D
 FEATURE_LIGHT_STATE = 0x0D00
 FEATURE_LIGHT_THEME = 0x0D40
 FEATURE_LIGHT_SPEED = 0x0D43
@@ -34,7 +35,13 @@ def packet(command: int, payload: bytes) -> bytes:
 def get_light_status_packet() -> bytes:
     return packet(
         COMMAND_GET,
-        struct.pack("<HHH", FEATURE_LIGHT_THEME, FEATURE_LIGHT_STATE, FEATURE_LIGHT_SPEED),
+        struct.pack(
+            "<HHHH",
+            FEATURE_BATTERY_STATUS,
+            FEATURE_LIGHT_THEME,
+            FEATURE_LIGHT_STATE,
+            FEATURE_LIGHT_SPEED,
+        ),
     )
 
 
@@ -72,6 +79,8 @@ def light_status(replies: Iterable[bytes]) -> dict[int, bytes]:
             values[feature] = value
     if FEATURE_LIGHT_STATE not in values:
         raise RuntimeError("The speaker did not return a light-state response")
+    if FEATURE_BATTERY_STATUS not in values:
+        raise RuntimeError("The speaker did not return a battery-status response")
     return values
 
 
@@ -131,6 +140,12 @@ async def main() -> None:
     print(f"Ambient light theme: {theme}")
     speed = values[FEATURE_LIGHT_SPEED][0] - 128
     print(f"Ambient light speed: {speed}")
+    battery = values[FEATURE_BATTERY_STATUS][0]
+    charging = battery >= 128
+    level = battery - 128 if charging else battery
+    if level >= 95:
+        level = 100
+    print(f"Battery: {level}%{' (charging)' if charging else ''}")
 
 
 

@@ -1,10 +1,11 @@
 # jbl-tool
 
-Control a JBL Go 5's ambient edge light from Linux over Bluetooth Low Energy. No JBL Portable app required.
+Control a JBL Go 5's ambient edge light and battery status from Linux over Bluetooth Low Energy. No JBL Portable app required.
 
-This repository currently supports verified ambient-light controls:
+This repository currently supports verified controls:
 
-- enabled/disabled: `status`, `on`, and `off`
+- battery percentage and charging state through `status`
+- enabled/disabled ambient light: `status`, `on`, and `off`
 - themes: `bounce`, `loop`, `switch`, and `freeze`
 - animation speed: `0` (slow), `1` (medium), and `2` (fast)
 
@@ -40,7 +41,7 @@ Find paired-device addresses with:
 bluetoothctl devices
 ```
 
-The command prints the resulting speaker state after every request.
+Every command prints the resulting ambient-light state and battery percentage.
 
 ## Protocol
 
@@ -52,7 +53,7 @@ write:   65786365-6c70-6f69-6e74-2e636f6d0002
 notify:  65786365-6c70-6f69-6e74-2e636f6d0001
 ```
 
-The light-state feature is `0x0D00`. JBL Portable sends `0x7F` to disable it and `0x80` to enable it. The light-theme feature is `0x0D40`; light speed is `0x0D43` and accepts `0` through `2`.
+The battery-status feature is `0x000D`: values `0`–`127` are a percentage, while `128`–`227` mean the same percentage while charging. JBL Portable displays `95`–`100` as `100%`. The light-state feature is `0x0D00`. JBL Portable sends `0x7F` to disable it and `0x80` to enable it. The light-theme feature is `0x0D40`; light speed is `0x0D43` and accepts `0` through `2`.
 
 ## Bluetooth transport note
 
@@ -69,4 +70,4 @@ Some BlueZ/controller combinations do not establish a separate GATT control bear
 
 ## Reverse-engineered, not yet exposed
 
-The broader Protocol 4 implementation also contains controls for battery and firmware information, device naming, feedback tones, auto-standby, Playtime Boost, Auracast/group state, EQ, and additional lighting parameters. Those commands are intentionally not exposed until they are tested against the Go 5.
+The broader Protocol 4 implementation also contains controls for firmware information, device naming, feedback tones, auto-standby, Playtime Boost, Auracast/group state, EQ, and additional lighting parameters. Those commands are intentionally not exposed until they are tested against the Go 5.
