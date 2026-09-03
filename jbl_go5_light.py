@@ -17,6 +17,7 @@ COMMAND_GET = 0x0001
 COMMAND_SET = 0x0002
 FEATURE_LIGHT_STATE = 0x0D00
 FEATURE_LIGHT_THEME = 0x0D40
+FEATURE_LIGHT_SPEED = 0x0D43
 
 THEMES = {
     "bounce": 0x89,
@@ -33,7 +34,7 @@ def packet(command: int, payload: bytes) -> bytes:
 def get_light_status_packet() -> bytes:
     return packet(
         COMMAND_GET,
-        struct.pack("<HH", FEATURE_LIGHT_THEME, FEATURE_LIGHT_STATE),
+        struct.pack("<HHH", FEATURE_LIGHT_THEME, FEATURE_LIGHT_STATE, FEATURE_LIGHT_SPEED),
     )
 
 
@@ -44,6 +45,14 @@ def set_light_state_packet(enabled: bool) -> bytes:
 
 def set_light_theme_packet(theme: str) -> bytes:
     return packet(COMMAND_SET, struct.pack("<HHB", FEATURE_LIGHT_THEME, 1, THEMES[theme]))
+
+
+def set_light_speed_packet(level: int) -> bytes:
+    if not 0 <= level <= 2:
+        raise ValueError("light speed must be between 0 (slow) and 2 (fast)")
+    return packet(COMMAND_SET, struct.pack("<HHB", FEATURE_LIGHT_SPEED, 1, level + 128))
+
+
 
 
 def light_status(replies: Iterable[bytes]) -> dict[int, bytes]:
@@ -86,11 +95,17 @@ async def exchange(address: str, commands: Iterable[bytes]) -> list[bytes]:
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("status", "on", "off", "theme"))
+    parser.add_argument("action", choices=("status", "on", "off", "theme", "speed"))
     parser.add_argument(
         "--theme",
         choices=THEMES,
         help="ambient light theme; required with the theme action",
+    )
+    parser.add_argument(
+        "--speed",
+        type=int,
+        metavar="0..2",
+        help="ambient light speed; required with the speed action",
     )
     parser.add_argument("--address", default=DEFAULT_ADDRESS, help="speaker Bluetooth address")
     args = parser.parse_args()
@@ -98,11 +113,15 @@ async def main() -> None:
     if args.action == "theme" and args.theme is None:
         parser.error("--theme is required with the theme action")
 
+    if args.action == "speed" and args.speed is None:
+        parser.error("--speed is required with the speed action")
     commands: list[bytes] = []
     if args.action in ("on", "off"):
         commands.append(set_light_state_packet(args.action == "on"))
     elif args.action == "theme":
         commands.append(set_light_theme_packet(args.theme))
+    elif args.action == "speed":
+        commands.append(set_light_speed_packet(args.speed))
     commands.append(get_light_status_packet())
 
     values = light_status(await exchange(args.address, commands))
@@ -110,6 +129,8 @@ async def main() -> None:
     theme = next(name for name, value in THEMES.items() if values[FEATURE_LIGHT_THEME] == bytes([value]))
     print(f"Ambient edge light: {'on' if enabled else 'off'}")
     print(f"Ambient light theme: {theme}")
+    speed = values[FEATURE_LIGHT_SPEED][0] - 128
+    print(f"Ambient light speed: {speed}")
 
 
 

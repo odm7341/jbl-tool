@@ -6,6 +6,7 @@ This repository currently supports verified ambient-light controls:
 
 - enabled/disabled: `status`, `on`, and `off`
 - themes: `bounce`, `loop`, `switch`, and `freeze`
+- animation speed: `0` (slow), `1` (medium), and `2` (fast)
 
 ## Requirements
 
@@ -31,6 +32,7 @@ The utility defaults to the Bluetooth address used during development. For anoth
 ./jbl_go5_light.py theme --theme loop --address 74:68:59:7E:98:33
 ./jbl_go5_light.py theme --theme switch --address 74:68:59:7E:98:33
 ./jbl_go5_light.py theme --theme freeze --address 74:68:59:7E:98:33
+./jbl_go5_light.py speed --speed 2 --address 74:68:59:7E:98:33
 
 Find paired-device addresses with:
 
@@ -50,7 +52,7 @@ write:   65786365-6c70-6f69-6e74-2e636f6d0002
 notify:  65786365-6c70-6f69-6e74-2e636f6d0001
 ```
 
-The light-state feature is `0x0D00`. JBL Portable sends `0x7F` to disable it and `0x80` to enable it. The light-theme feature is `0x0D40`.
+The light-state feature is `0x0D00`. JBL Portable sends `0x7F` to disable it and `0x80` to enable it. The light-theme feature is `0x0D40`; light speed is `0x0D43` and accepts `0` through `2`.
 
 ## Bluetooth transport note
 
