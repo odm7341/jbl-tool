@@ -91,15 +91,20 @@ async def exchange(address: str, commands: Iterable[bytes]) -> list[bytes]:
     def on_reply(_: object, data: bytearray) -> None:
         replies.append(bytes(data))
 
-    async with BleakClient(address, timeout=15) as client:
-        await client.start_notify(SERVICE_NOTIFY, on_reply)
-        for command in commands:
-            await client.write_gatt_char(SERVICE_WRITE, command, response=True)
-            await asyncio.sleep(0.5)
-        await asyncio.sleep(1)
-        await client.stop_notify(SERVICE_NOTIFY)
+    try:
+        async with BleakClient(address, timeout=15) as client:
+            await client.start_notify(SERVICE_NOTIFY, on_reply)
+            for command in commands:
+                await client.write_gatt_char(SERVICE_WRITE, command, response=True)
+                await asyncio.sleep(0.5)
+            await asyncio.sleep(1)
+            await client.stop_notify(SERVICE_NOTIFY)
+    except EOFError:
+        if not replies:
+            raise
 
     return replies
+
 
 
 async def main() -> None:
